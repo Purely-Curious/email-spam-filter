@@ -1,10 +1,13 @@
+extern crate rust_stemmers;
+use rust_stemmers::{Algorithm, Stemmer};
+
 use std::{error::Error};
 use std::fs;
 use csv;
 use serde::Deserialize;
 
 
-use std::process::exit;
+// use std::process::exit;
 // A structure for hosting the junk data from the csv file.
 #[derive(Debug, Deserialize)]
 struct UnprocessedText {
@@ -21,7 +24,7 @@ impl UnprocessedText {
             .rev()
             .collect::<Vec<String>>();
         ProcessedText {
-            text: remove_stop_words(text),
+            text: stemming(remove_stop_words(text)),
         }
     }
 }
@@ -58,8 +61,6 @@ fn find(text: &Vec<String>, word: &String) -> usize {
 // A function that will be required to remove all of the stop words from the unprocessed data.
 fn remove_stop_words(text: Vec<String>) -> Vec<String>{
     let stop_words = load_stop_words("../stopwords2.txt").unwrap();
-    //println!("{:?}", stop_words);
-    //exit(1);
     let mut processed_text: Vec<String> = text.clone();
     
     for word in stop_words {
@@ -77,8 +78,15 @@ fn remove_stop_words(text: Vec<String>) -> Vec<String>{
 
 // A function to stem the processed words.
 fn stemming(text: Vec<String>) -> Vec<String> {
-    let stemmed_words: Vec<String> = Vec::new();
+    
+    let mut stemmed_words: Vec<String> = Vec::new();
+    let stemmer = Stemmer::create(Algorithm::English);
+    for word in text {
+        stemmed_words.push(stemmer.stem(word.to_lowercase().as_str())
+            .to_string());
+    }
     stemmed_words
+
 }
 
 fn read_in_emails(path: &str) -> Result<(), Box<dyn Error>> {
