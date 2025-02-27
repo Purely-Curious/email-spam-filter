@@ -1,9 +1,8 @@
-//#![allow(dead_code)]
 
 extern crate rust_stemmers;
 use rust_stemmers::{Algorithm, Stemmer};
 use std::io::{self, Write};
-use std::{error::Error};
+use std::error::Error;
 use std::fs::{self, File};
 use std::collections::HashMap;
 use csv;
@@ -17,6 +16,7 @@ use serde::Deserialize;
 // if a word appears several times in the email or a word wasn't present in the training data. [ i.e. p(word) = 0 ]
 
 // if p(word) = 0, then p(word) = #(no of word in category) / #(words in category)
+
 
 // A structure for hosting the junk data from the csv file.
 #[derive(Debug, Deserialize)]
@@ -49,10 +49,6 @@ impl UnprocessedText {
 struct ProcessedText {
     _text: Vec<String>,
     spam_or_not: u8,
-}
-
-impl ProcessedText {
-    // fn _word_specifier(&self, ham_wordset: &mut Vec<String>, spam_wordset: &mut Vec<String>) {}
 }
 
 #[derive(Debug)]
@@ -286,7 +282,6 @@ fn write_out_emails_to_file(emails: Vec<ProcessedText>, filename: &str) {
     for email in emails {
         for text in email._text {
             file.write(text.as_bytes()).expect("An incorrect email was passed");
-            //fs::write(filename, text).expect("An incorrect email was passed.");
         }
     }
 }

@@ -1,6 +1,10 @@
 
 # How to use.
 
+### CSV format
+* the columns should be text and a number
+* the number represents whether or not the message is spam or not, 1 if spam, 0 if ham (not spam).
+
 If there's no provided dataset, it'll run with the internal dataset.
 
 > cargo run < [insert your own email dataset]
