@@ -2,8 +2,9 @@
 
 extern crate rust_stemmers;
 use rust_stemmers::{Algorithm, Stemmer};
+use std::io::Write;
 use std::{error::Error};
-use std::fs;
+use std::fs::{self, File};
 use std::collections::HashMap;
 use csv;
 use serde::Deserialize;
@@ -28,11 +29,13 @@ impl UnprocessedText {
     // This functional statement removes the non alphanumeric characters and transforms
     // the junk email into a vector of strings. (extracted words.)
     fn processing_text(&self) -> ProcessedText {
+        
         let text: Vec<String> = self.text.rsplit(|c: char| !c.is_ascii_alphabetic())
             .filter(|s| !s.is_empty() && s.len() > 1)
             .map(|s| s.to_string())
             .rev()
             .collect::<Vec<String>>();
+
         ProcessedText {
             _text: stemming(remove_stop_words(text)),
             spam_or_not: self.spam,
@@ -173,7 +176,7 @@ impl EmailClassifier {
         result
     }
     // the function that classifies the emails.
-    fn classify_email(&self, email: &mut ProcessedText) {
+    fn classify_email(&self, email: &mut ProcessedText) -> ProcessedText {
         let email_spam_chance = self.email_spam_probablity(&email);
         let email_non_spam_chance = self.email_non_spam_probablity(&email);
 
@@ -183,6 +186,8 @@ impl EmailClassifier {
         else {
             email.spam_or_not = 0;
         }
+        // returning the email after modifications.
+        email.clone()
     }
 }
 
@@ -259,10 +264,43 @@ fn read_in_emails(path: &str) -> Result<Vec<ProcessedText>, Box<dyn Error>> {
 }
 
 
+// hopefully works.
+fn write_out_emails_to_file(emails: Vec<ProcessedText>, filename: &str) {
+    let mut file = File::create(filename).expect("Was unable to create the file.");
+    for email in emails {
+        for text in email._text {
+            file.write(text.as_bytes()).expect("An incorrect email was passed");
+            //fs::write(filename, text).expect("An incorrect email was passed.");
+        }
+    }
+}
+
 
 fn main() {
     let training_records: Vec<ProcessedText> = read_in_emails("emails.csv").unwrap();
     // this is the email classifier made with the training data used for the classifier.
     let mut email_classifier: EmailClassifier = EmailClassifier::new(training_records);
     email_classifier.update_training_classification();
+
+    // need to give the user an option to provide their own emails and training data.
+
+    let filename = "hi";
+    let user_defined_records = read_in_emails(filename).unwrap();
+
+    let mut spam_emails = vec![];
+    let mut ham_emails = vec![];
+    // goes through the emails provided by the user.
+    for mut email in user_defined_records {
+        let updated_email = email_classifier.classify_email(&mut email);
+        if updated_email.spam_or_not == 0 {
+            spam_emails.push(updated_email);
+        }
+        else {
+            ham_emails.push(updated_email);
+        }
+    }
+    // function that writes out the emails to different text files at the end of it.
+    write_out_emails_to_file(spam_emails, "list_of_spam_emails.txt");
+    write_out_emails_to_file(ham_emails, "list_of_ham_emails.txt");
+    
 }

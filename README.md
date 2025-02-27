@@ -9,5 +9,5 @@ However if that isnt the case. Run.
 > cargo run or cargo r
 
 
-Then enter your emails in the form of a csv file after the prompt. T
-he provided emails will be classified as either spam or ham (not spam) and written into a two different text files. The spam emails residing in one file and the ham ones in the other.
+Then enter your emails in the form of a csv file after the prompt. 
+The provided emails will be classified as either spam or ham (not spam) and written into a two different text files. The spam emails residing in one file and the ham ones in the other.
