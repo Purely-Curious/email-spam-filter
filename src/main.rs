@@ -1,18 +1,18 @@
-#![allow(dead_code)]
+//#![allow(dead_code)]
 
 extern crate rust_stemmers;
 use rust_stemmers::{Algorithm, Stemmer};
-use std::io::Write;
+use std::io::{self, Write};
 use std::{error::Error};
 use std::fs::{self, File};
 use std::collections::HashMap;
 use csv;
 use serde::Deserialize;
 
-// p(non_spam) =  #(non_spam messages) /  (total messages)
-// p(messages being non_spam) = p(non_spam) * p(words of the messages given that they're not spam) [training data.]
+// p(ham) =  #(ham messages) /  (total messages)
+// p(messages being ham) = p(ham) * p(words of the messages given that they're not spam) [training data.]
 
-// calculate the probabilites of the message being spam and non_spam and which ever is greater is the label. [if n_s is greater, then label it as non_spam].
+// calculate the probabilites of the message being spam and ham and which ever is greater is the label. [if n_s is greater, then label it as ham].
 
 // if a word appears several times in the email or a word wasn't present in the training data. [ i.e. p(word) = 0 ]
 
@@ -52,23 +52,23 @@ struct ProcessedText {
 }
 
 impl ProcessedText {
-    // fn _word_specifier(&self, non_spam_wordset: &mut Vec<String>, spam_wordset: &mut Vec<String>) {}
+    // fn _word_specifier(&self, ham_wordset: &mut Vec<String>, spam_wordset: &mut Vec<String>) {}
 }
 
 #[derive(Debug)]
 struct WordClassifier {
     spam_word_count: HashMap<String, usize>,
-    non_spam_word_count: HashMap<String, usize>,
+    ham_word_count: HashMap<String, usize>,
     spam_words: HashMap<String, f32>,
-    non_spam_words: HashMap<String, f32>,
+    ham_words: HashMap<String, f32>,
     total_spam_words: usize,
-    total_non_spam_words: usize,
+    total_ham_words: usize,
 }
 
 impl WordClassifier {
     fn new(processed_texts: Vec<ProcessedText>) -> Self {
         let mut spam_word_count: HashMap<String, usize> = HashMap::new();
-        let mut non_spam_word_count: HashMap<String, usize> = HashMap::new();
+        let mut ham_word_count: HashMap<String, usize> = HashMap::new();
         
         for processed_text in processed_texts {
             for word in processed_text._text {
@@ -76,17 +76,17 @@ impl WordClassifier {
                     spam_word_count.insert(word, 0);
                 }
                 else {
-                    non_spam_word_count.insert(word, 0);
+                    ham_word_count.insert(word, 0);
                 }
             }
         }
         WordClassifier {
             spam_word_count,
-            non_spam_word_count,
+            ham_word_count,
             spam_words: HashMap::default(),
-            non_spam_words: HashMap::default(),
+            ham_words: HashMap::default(),
             total_spam_words: 0,
-            total_non_spam_words: 0,
+            total_ham_words: 0,
         }
     }
     // This creates a hashmap so that the words are correctly classified into their proper categories.
@@ -99,23 +99,34 @@ impl WordClassifier {
         }
         else {
             for word in processed_text._text {
-                *self.non_spam_word_count.get_mut(&word).unwrap() +=1;
-                self.total_non_spam_words += 1;
+                *self.ham_word_count.get_mut(&word).unwrap() +=1;
+                self.total_ham_words += 1;
             }
         }
     }
 
+    // need to added one to each word in the word classifier to ensure that no emails are accidentally misattributed.
+    fn update_words(&mut self) {
+        for val in self.spam_word_count.values_mut() {
+            *val +=1;
+        }
+        for val in self.ham_word_count.values_mut() {
+            *val +=1;
+        }
+        
+    }
+    
     fn update_classification(&mut self) {
-        let spam_words = self.spam_word_count.keys();
-        for word in spam_words {
-            // need to added one to each word in the word classifier to ensure that no emails are accidentally misattributed.
-            //*self.spam_word_count.get_mut(word).unwrap() +=1;
+        self.update_words();
+        for word in self.spam_word_count.keys() {
+
             let count: usize = *self.spam_word_count.get(word).unwrap(); 
             self.spam_words.insert(word.to_string(), count as f32 / self.total_spam_words as f32);
         }
-        for word in self.non_spam_word_count.keys() {
-            let count: usize = *self.non_spam_word_count.get(word).unwrap(); 
-            self.non_spam_words.insert(word.to_string(), count as f32 / self.total_non_spam_words as f32);
+        for word in self.ham_word_count.keys() {
+
+            let count: usize = *self.ham_word_count.get(word).unwrap(); 
+            self.ham_words.insert(word.to_string(), count as f32 / self.total_ham_words as f32);
         }
     }
 }
@@ -144,9 +155,11 @@ impl EmailClassifier {
         for record in self.total_emails.clone() {
             self.word_classifier.word_specifier(record);
         }
+        self.word_classifier.update_classification();
+
         let amount_of_emails = self.total_emails.len() as f32;
         for email in &self.total_emails {
-            if email.spam_or_not == 0 {
+            if email.spam_or_not == 1 {
                 self.email_is_spam += 1.0;
             }
             else {
@@ -168,19 +181,19 @@ impl EmailClassifier {
         result
     }
 
-    fn email_non_spam_probablity(&self, email: &ProcessedText) -> f32 {
+    fn email_ham_probablity(&self, email: &ProcessedText) -> f32 {
         let mut result = self.email_is_not_spam;
         for word in email.clone()._text {
-            result *= self.word_classifier.non_spam_words.get(&word).unwrap();
+            result *= self.word_classifier.ham_words.get(&word).unwrap();
         }
         result
     }
     // the function that classifies the emails.
     fn classify_email(&self, email: &mut ProcessedText) -> ProcessedText {
         let email_spam_chance = self.email_spam_probablity(&email);
-        let email_non_spam_chance = self.email_non_spam_probablity(&email);
+        let email_ham_chance = self.email_ham_probablity(&email);
 
-        if email_non_spam_chance > email_spam_chance {
+        if email_ham_chance > email_spam_chance {
             email.spam_or_not = 1;
         }
         else {
@@ -245,7 +258,6 @@ fn stemming(text: Vec<String>) -> Vec<String> {
 }
 
 
-fn _correlation_based_feature() {}
 
 fn read_in_emails(path: &str) -> Result<Vec<ProcessedText>, Box<dyn Error>> {
 
@@ -254,11 +266,15 @@ fn read_in_emails(path: &str) -> Result<Vec<ProcessedText>, Box<dyn Error>> {
     let mut processed_records: Vec<ProcessedText> = vec![];
     let _headers = rdr.headers()?;
 
-    for result in rdr.deserialize() {
-        let record: UnprocessedText = result?;
-        let processed_record: ProcessedText = record.processing_text();
-        processed_records.push(processed_record);
+    for result in rdr.deserialize::<UnprocessedText>() {
+        match result {
+            Ok(record) => {
+                let processed_record: ProcessedText = record.processing_text();
+                processed_records.push(processed_record);
+            }
+            Err(e) => eprint!("Error: The csv file is not in the correct format. \n{}", e),
         }
+    }
     
     Ok(processed_records)
 }
@@ -277,15 +293,24 @@ fn write_out_emails_to_file(emails: Vec<ProcessedText>, filename: &str) {
 
 
 fn main() {
-    let training_records: Vec<ProcessedText> = read_in_emails("emails.csv").unwrap();
+    println!("For the training data, the csv file must be of the format: text,is_spam. where is_spam is a u8 variable with 1 being that the message is spam and 0 meaning that it's ham.");
+    println!("Please enter the csv file which will be used as a reference for email spam classification.");
+    let mut training_file = String::new();
+    io::stdin().read_line(&mut training_file).expect("That file doesn't exist.");
+
+
+    let training_records: Vec<ProcessedText> = read_in_emails(training_file.as_str()).unwrap();
     // this is the email classifier made with the training data used for the classifier.
     let mut email_classifier: EmailClassifier = EmailClassifier::new(training_records);
     email_classifier.update_training_classification();
 
     // need to give the user an option to provide their own emails and training data.
 
-    let filename = "hi";
-    let user_defined_records = read_in_emails(filename).unwrap();
+    let mut filename = String::new();
+    println!("Please enter the csv file containing the emails that are to be used for classification.");
+    io::stdin().read_line(&mut filename).expect("That file doesn't exist.");
+
+    let user_defined_records = read_in_emails(filename.as_str()).unwrap();
 
     let mut spam_emails = vec![];
     let mut ham_emails = vec![];
